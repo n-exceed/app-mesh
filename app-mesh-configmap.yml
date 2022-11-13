@@ -1,0 +1,336 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sme-develop
+  labels:
+    appmesh.k8s.aws/sidecarInjectorWebhook: enabled
+    mesh: sme-apps 
+
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: Mesh
+metadata:
+  name: sme-apps
+spec:
+  namespaceSelector:
+    matchLabels:
+      mesh: sme-apps
+
+#########################onboarding-web#########################333
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualNode
+metadata:
+  name: sme-onboarding-web
+  namespace: sme-develop
+spec:
+  podSelector:
+    matchLabels:
+      app: appzillon-web
+      version: v1
+  listeners:
+    - portMapping:
+        port: 9090
+        protocol: http
+      healthCheck:
+        protocol: http
+        path: '/'
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        timeoutMillis: 2000
+        intervalMillis: 5000
+  serviceDiscovery:
+    dns:
+      hostname: sme-onboarding-web.sme-develop.svc.cluster.local
+  backends:
+    - virtualService:
+        virtualServiceRef:
+          name: sme-server
+    ######################on-boarding-server###########################33
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualNode
+metadata:
+  name: sme-onboarding-server
+  namespace: sme-develop
+spec:
+  awsName: sme-onboarding-server-virtual-node
+  podSelector:
+    matchLabels:
+      app: appzillon-server
+      version: v3
+  listeners:
+    - portMapping:
+        port: 9090
+        protocol: http 
+      healthCheck:
+        protocol: http
+        path: '/'
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        timeoutMillis: 2000
+        intervalMillis: 5000 
+  serviceDiscovery:
+    dns:
+      hostname: sme-onboarding-server.sme-develop.svc.cluster.local
+  backends:
+    - virtualService:
+       virtualServiceRef:
+          name: onboard-overlay  ## suppose to add virtual service name of overlay 
+
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualService
+metadata:
+  name: sme-server
+  namespace: sme-develop
+spec:
+  awsName: sme-onboarding-server-virtual-node
+  provider:
+    virtualNode:
+      virtualNodeRef:
+        name: sme-onboarding-server
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sme-server
+  namespace: sme-develop
+  labels:
+    app: appzillon-server
+    version: v1
+spec:
+  ports:
+  - port: 9090
+    name: http
+
+########################onboarding-overlay####################
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualNode
+metadata:
+  name: sme-onboarding-overlay
+  namespace: sme-develop
+spec:
+  podSelector:
+    matchLabels:
+      app: apz-onboard-overlay
+      version: v1
+  listeners:
+    - portMapping:
+        port: 8095
+        protocol: http
+      healthCheck:
+        protocol: http
+        path: '/'
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        timeoutMillis: 2000
+        intervalMillis: 5000
+  serviceDiscovery:
+    dns:
+      hostname: sme-onboard-overlay.sme-develop.svc.cluster.local
+  backends:
+    - virtualService:
+        virtualServiceRef:
+          name: corporate-onboard     ### suppose to add virtualservice name of corporate onboard 
+
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualService
+metadata:
+  name: onboard-overlay
+  namespace: sme-develop
+spec:
+  awsName: sme-oboarding-overlay-virtual-service 
+  provider:
+    virtualNode:
+      virtualNodeRef:
+        name: sme-onboarding-overlay
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: onboard-overlay
+  namespace: sme-develop
+  labels:
+    app: apz-onboard-overlay
+    version: v1
+spec:
+  ports:
+  - port: 8095
+    name: http
+
+---
+##############corporate-onboard##########################
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualNode
+metadata:
+  name: sme-corporate-onboard
+  namespace: sme-develop
+spec:
+  awsName: sme-corporate-onboard-virtual-node
+  podSelector:
+    matchLabels:
+      app: corporate-onboard-service
+      version: v1
+  listeners:
+    - portMapping:
+        port: 8080
+        protocol: http 
+      healthCheck:
+        protocol: http
+        path: '/'
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        timeoutMillis: 2000
+        intervalMillis: 5000 
+  serviceDiscovery:
+    dns:
+      hostname: sme-corporate-onboard-service.sme-develop.svc.cluster.local
+  backends:
+    - virtualService:
+       virtualServiceRef:
+          name: workflow-service  ##### suppose to add virtualservice name of workflow 
+
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualService
+metadata:
+  name: corporate-onboard 
+  namespace: sme-develop
+spec:
+  awsName: sme-corporate-onboard-virtual-service 
+  provider:
+    virtualNode:
+      virtualNodeRef:
+        name:  sme-corporate-onboard
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: corporate-onboard
+  namespace: sme-develop
+  labels:
+    app: corporate-onboard-service
+    version: v1
+spec:
+  ports:
+  - port: 8080
+    name: http
+
+---
+############workflow-service#########
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualNode
+metadata:
+  name: sme-workflow-service 
+  namespace: sme-develop
+spec:
+  podSelector:
+    matchLabels:
+      app: apz-appzillon-workflow-service
+      version: v1
+  listeners:
+    - portMapping:
+        port:  9092
+        protocol: http
+      healthCheck:
+        protocol: http
+        path: '/'
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        timeoutMillis: 2000
+        intervalMillis: 5000
+  serviceDiscovery:
+    dns:
+      hostname: sme-appzillon-workflow-service .sme-develop.svc.cluster.local
+  backends:
+    - virtualService:
+        virtualServiceRef:
+          name: user-authorization        #### suppose to add virtual service name of user authorisation
+
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualService
+metadata:
+  name: workflow-service 
+  namespace: sme-develop
+spec:
+  awsName: sme-workflow-service-virtual-service 
+  provider:
+    virtualNode:
+      virtualNodeRef:
+        name: sme-workflow-service
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-service
+  namespace: sme-develop
+  labels:
+    app: apz-appzillon-workflow-service
+    version: v1
+spec:
+  ports:
+  - port: 9092
+    name: http
+
+---
+#########user-authorisation#######################
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualNode
+metadata:
+  name: sme-user-authorisation
+  namespace: sme-develop
+spec:
+  awsName: -virtual-node
+  podSelector:
+    matchLabels:
+      app: apz-corporate-user-authorization
+      version: v1
+  listeners:
+    - portMapping:
+        port: 8080
+        protocol: http 
+      healthCheck:
+        protocol: http
+        path: '/'
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        timeoutMillis: 2000
+        intervalMillis: 5000 
+  serviceDiscovery:
+    dns:
+      hostname: sme-corporate-user-authorization.sme-develop.svc.cluster.local
+
+---
+apiVersion: appmesh.k8s.aws/v1beta2
+kind: VirtualService
+metadata:
+  name: user-authorization 
+  namespace: sme-develop
+spec:
+  awsName: sme-user-authorization-virtual-service 
+  provider:
+    virtualNode:
+      virtualNodeRef:
+        name: sme-user-authorisation
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-authorization
+  namespace: sme-develop
+  labels:
+    app: apz-corporate-user-authorization
+    version: v1
+spec:
+  ports:
+  - port: 8080
+    name: http
